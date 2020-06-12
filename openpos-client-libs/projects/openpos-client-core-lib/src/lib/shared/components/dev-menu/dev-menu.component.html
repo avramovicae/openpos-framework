@@ -280,62 +280,7 @@
                     </div>
                 </div>
             </mat-tab>
-            <mat-tab *ngIf="useSavePoints()" label="Save Points">
-                <h1>Save Points</h1>
 
-                <div *ngIf="displaySavePoints" class="savePoints" [style.height.px]="'300'">
-                    <mat-card>
-                        <mat-card-title></mat-card-title>
-                        <mat-card-content>
-                            <table class="mat-table">
-                                <thead>
-                                    <tr style="text-align:left" class="mat-header-row">
-                                        <th class="mat-header-cell"> Name </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="mat-row" *ngFor="let element of savePoints">
-                                        <td class="mat-cell"> {{element}} </td>
-                                        <td class="mat-cell" style="text-align:center">
-                                            <button mat-button color="accent"
-                                                (click)="onLoadSavePoint(element)">Load</button>
-                                        </td>
-                                        <td class="mat-cell-close">
-                                            <button mat-icon-button (click)="onSavePointRemove(element)">
-                                                <mat-icon aria-label="delete">close</mat-icon>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </mat-card-content>
-                    </mat-card>
-                </div>
-                <mat-action-row>
-                    <div fxFlex="none" fxLayout="row" fxLayoutAlign="left center" fxLayoutAlign.xs="left">
-                        <mat-form-field appearance="standard">
-                            <input matInput #newSavePoint
-                                (keyup.enter)="onCreateSavePoint(newSavePoint.value); newSavePoint.value=''"
-                                placeholder="Create a Save Point">
-                            <mat-icon matSuffix>
-                                <button mat-icon-button
-                                    (click)="onCreateSavePoint(newSavePoint.value); newSavePoint.value=''">
-                                    <mat-icon aria-label="save">save</mat-icon>
-                                </button>
-                            </mat-icon>
-                        </mat-form-field>
-                    </div>
-                    <div fxFlex=""></div>
-                    <!-- <div fxFlex="nogrow" fxLayoutAlign="right center">
-                                <button mat-raised-button color="primary" (click)="onDevMenuClick()">
-                                        Close Tools
-                                </button>
-                            </div> -->
-
-
-                </mat-action-row>
-
-            </mat-tab>
             <mat-tab *ngIf="logFilenames && logFilenames.length > 0" label="Logs">
                 <h1>Logs</h1>
                 <div class="logs">
@@ -382,10 +327,10 @@
                 </div>
             </mat-tab>
             <mat-tab *ngIf="isElectronEnabled()" label="Electron">
-                <div fxFlex="none" fxLayout="row" fxLayoutAlign="left center" fxLayoutAlign.xs="left">
-                    <button mat-raised-button color="primary" (click)="toggleChromiumDevTools()">Toggle Dev
-                        Tools</button>
-                    <button mat-raised-button color="primary" (click)="exitElectronApp()">Exit App</button>
+                <h1>Options</h1>
+                <div class="prompt-buttons">
+                        <button mat-raised-button color="primary" (click)="toggleChromiumDevTools()">Toggle Dev Tools</button>
+                        <button mat-raised-button color="primary" (click)="exitElectronApp()">Exit App</button>
                 </div>
             </mat-tab>
             <mat-tab label="About">

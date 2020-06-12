@@ -40,7 +40,7 @@ public class PersistTestUtil {
             log.error("Could not load Driver", ex);
         }
  
-        props.setProperty("db.url", "jdbc:openpos:h2:mem:open-pos-test;LOCK_TIMEOUT=60000;DB_CLOSE_DELAY=-1");
+        props.setProperty("db.url", "jdbc:h2:mem:open-pos-test;LOCK_TIMEOUT=60000;DB_CLOSE_DELAY=-1");
         props.setProperty("db.user", "");
         props.setProperty("db.password", "");
         props.setProperty("db.driver", "org.h2.Driver");

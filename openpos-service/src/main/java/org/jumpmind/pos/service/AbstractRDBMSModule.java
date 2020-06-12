@@ -182,7 +182,19 @@ abstract public class AbstractRDBMSModule extends AbstractServiceFactory impleme
 
     @Override
     public String getURL() {
-        return getDbProperties(DB_POOL_URL, "jdbc:openpos:h2:mem:" + getName());
+        String url = getDbProperties(DB_POOL_URL, "jdbc:openpos:h2:mem:" + getName() + ";DB_CLOSE_ON_EXIT=FALSE");
+        if (url.contains("openpos")) {
+            loadJumpMindDriver();
+        }
+        return url;
+    }
+
+    protected static void loadJumpMindDriver() {
+        try {
+            Class.forName(Driver.class.getName());
+        } catch (ClassNotFoundException ex) {
+            ex.printStackTrace();
+        }
     }
 
     @Override
@@ -292,23 +304,32 @@ abstract public class AbstractRDBMSModule extends AbstractServiceFactory impleme
             log.info("The module table is not available");
         }
 
+        String currentVersion = getVersion();
         log.info("The previous version of {} was {} and the current version is {}. sqlScriptProfile: {}", getName(),
-                fromVersion, getVersion(), sqlScriptProfile);
+                fromVersion, currentVersion, sqlScriptProfile);
         DatabaseScriptContainer scripts = new DatabaseScriptContainer(String.format("%s/sql/%s", getName(), sqlScriptProfile),
                 getDatabasePlatform());
 
         IDBSchemaListener schemaListener = getDbSchemaListener();
 
-        scripts.executePreInstallScripts(fromVersion, getVersion());
+        scripts.executePreInstallScripts(fromVersion, currentVersion);
         schemaListener.beforeSchemaCreate(sessionFactory);
         sessionFactory.createAndUpgrade();
         upgradeDbFromXml();
         schemaListener.afterSchemaCreate(sessionFactory);
-        scripts.executePostInstallScripts(fromVersion, getVersion());
+        scripts.executePostInstallScripts(fromVersion, currentVersion);
 
-        session.save(new ModuleModel(installationId, getVersion()));
+        ModuleModel moduleModel = session.findByNaturalId(ModuleModel.class, installationId);
+        if (moduleModel == null) {
+            moduleModel = new ModuleModel(installationId, currentVersion);
+        } else {
+            if (!moduleModel.getCurrentVersion().equals(currentVersion)) {
+                moduleModel.setCurrentVersion(currentVersion);
+            }
+        }
+        session.save(moduleModel);
     }
-
+    
     protected void upgradeDbFromXml() {
         String path = "/" + getName() + "-schema.xml";
         URL resource = getClass().getResource(path);

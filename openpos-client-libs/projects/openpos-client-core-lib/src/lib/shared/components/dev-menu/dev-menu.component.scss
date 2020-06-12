@@ -96,3 +96,14 @@ table {
         white-space: nowrap;
     }
 }
+
+.prompt-buttons {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  grid-row-gap: 8px;
+  grid-column-gap: 8px;
+  &.mobile {
+    grid-column-gap: 4px;
+  }
+}

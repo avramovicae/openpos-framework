@@ -121,7 +121,8 @@ test {
     // ignoreFailures = true
     testLogging.showStandardStreams = true
 
-    forkEvery = 1
+//     forkEvery = 1
+//     maxParallelForks = 5
 
     //Dynamic exclude through property defined in the build.gradle file
     if (project.hasProperty('excludeTests')) {

@@ -34,7 +34,7 @@ openpos:
           business_date < '${businessDate-30}'
 ---                
 db:
-  url: jdbc:openpos:h2:mem:test
+  url: jdbc:h2:mem:test
   user:
   password:
   driver: org.h2.Driver

@@ -7,10 +7,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class TagHelper {
 
@@ -26,9 +29,15 @@ public class TagHelper {
         
         int bestMatchScore = -1;
         ITaggedModel mostSpecific = null;
+
+        String clazzName = taggedElements.size() > 0 ? taggedElements.get(0).getClass().getSimpleName() : null;
+        if (clazzName != null) {
+            log.debug("Calculating most specific for {}.  There are {} options.  Tag values are: {}", clazzName, taggedElements.size(), tagValues);
+        }
         
         for (ITaggedModel taggedElement : taggedElements) {
             int score = 0;
+            log.debug("Element has the following tags: {}", taggedElement.getTags());
             for (TagValue tagValue : tagValues) {
                 String taggedElementValue = taggedElement.getTagValue(tagValue.tagName);
                 if (taggedElementValue == null 
@@ -47,7 +56,9 @@ public class TagHelper {
                 bestMatchScore = score;
             }
         }
-        
+        if (mostSpecific != null) {
+            log.debug("Most specific has the following tags: {}", mostSpecific.getTags());
+        }
         return (T)mostSpecific;
     }
 
@@ -67,7 +78,8 @@ public class TagHelper {
         });
         return tagValues;
     }
-    
+
+    @ToString
      class TagValue {
         private String tagName;
         private String tagValue;

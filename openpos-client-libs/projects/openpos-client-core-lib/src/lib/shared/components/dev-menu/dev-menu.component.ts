@@ -344,10 +344,6 @@ export class DevMenuComponent implements OnInit, IMessageHandler<any> {
         }
     }
 
-    public useSavePoints(): boolean {
-        return Configuration.useSavePoints;
-    }
-
     public onDevMenuRefresh() {
         console.info('refreshing tools... ');
         this.displayStackTrace = false;

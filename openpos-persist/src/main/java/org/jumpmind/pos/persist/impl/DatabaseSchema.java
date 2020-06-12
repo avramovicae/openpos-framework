@@ -16,7 +16,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import lombok.Delegate;
 import org.apache.commons.collections4.map.CaseInsensitiveMap;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.money.Money;
@@ -161,7 +160,7 @@ public class DatabaseSchema {
             classToModelMetaData.put(entityClass, modelMetaData);
             for (ModelClassMetaData meta : modelMetaData.getModelClassMetaData()) {
                 validateTable(tablePrefix, meta.getTable());
-                Table exists = tables.stream().filter(p -> p.equals(meta.getTable())).findFirst().orElse(null);
+                Table exists = tables.stream().filter(p -> p.getName().equals(meta.getTable().getName())).findFirst().orElse(null);
                 if (exists != null) {
                     meta.setTable(exists);
                 } else {
@@ -172,19 +171,19 @@ public class DatabaseSchema {
         return tables;
     }
 
-    protected static List<Class<?>> getEntityExtensionClasses(Class<?> entityClazz, List<Class<?>> entityExtensionClasses){
-        if(entityExtensionClasses != null){
-            return entityExtensionClasses.stream().filter( extensionClazz -> {
+    protected static List<Class<?>> getEntityExtensionClasses(Class<?> entityClazz, List<Class<?>> entityExtensionClasses) {
+        if (entityExtensionClasses != null) {
+            return entityExtensionClasses.stream().filter(extensionClazz -> {
                 Extends extendsAnnotation = extensionClazz.getAnnotation(Extends.class);
                 return extendsAnnotation != null && entityClazz.equals(extendsAnnotation.entityClass());
             }).collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
-    
+
     protected String getTableName(String tablePrefix, String tableName) {
         if (isNotBlank(tablePrefix)) {
-            return  tablePrefix + "_" + tableName;
+            return tablePrefix + "_" + tableName;
         } else {
             return tableName;
         }
@@ -237,7 +236,7 @@ public class DatabaseSchema {
         Class<?> entityClass = clazz;
         boolean ignoreSuperClasses = false;
         while (entityClass != null && entityClass != Object.class) {
-            List<Class<?>> myExtensions =getEntityExtensionClasses(entityClass, entityExtensionClasses);
+            List<Class<?>> myExtensions = getEntityExtensionClasses(entityClass, entityExtensionClasses);
             TableDef tblAnnotation = entityClass.getAnnotation(TableDef.class);
             if (tblAnnotation != null && !ignoreSuperClasses) {
                 ignoreSuperClasses = tblAnnotation.ignoreSuperTableDef();
@@ -247,18 +246,17 @@ public class DatabaseSchema {
                 Table dbTable = new Table();
                 List<Column> columns = new ArrayList<>();
                 List<Column> pkColumns = new ArrayList<>();
-                Map<String, IIndex> indices = new HashMap<>();
                 dbTable.setName(tblAnnotation.name());
                 dbTable.setDescription(tblAnnotation.description());
                 Class<?> currentClass = entityClass;
                 boolean includeAllFields = true;
                 while (currentClass != null && currentClass != Object.class) {
-                    createClassFieldsMetadata(currentClass, meta,includeAllFields,columns,pkColumns,indices, databasePlatform);
+                    createClassFieldsMetadata(currentClass, meta, includeAllFields, columns, pkColumns, databasePlatform);
                     currentClass = currentClass.getSuperclass();
                     includeAllFields = currentClass != null && (currentClass.getAnnotation(TableDef.class) == null || ignoreSuperClasses);
                 }
-                for( Class<?> extensionClass: myExtensions){
-                    createClassFieldsMetadata(extensionClass, meta, true, columns, pkColumns, indices, databasePlatform);
+                for (Class<?> extensionClass : myExtensions) {
+                    createClassFieldsMetadata(extensionClass, meta, true, columns, pkColumns, databasePlatform);
                 }
                 for (Column column : pkColumns) {
                     dbTable.addColumn(column);
@@ -266,15 +264,24 @@ public class DatabaseSchema {
                 for (Column column : columns) {
                     dbTable.addColumn(column);
                 }
-                for (IIndex index : indices.values()) {
-                    dbTable.addIndex(index);
-                }
+
                 meta.setTable(dbTable);
                 modelClassValidator.validate(meta);
                 list.add(meta);
             }
             entityClass = entityClass.getSuperclass();
         }
+
+        for (ModelClassMetaData meta: list) {
+            Class<?> currentClass = meta.getClazz();
+            Table dbTable = meta.getTable();
+            IndexDefs indexDefs = currentClass.getAnnotation(IndexDefs.class);
+            Map<String, IIndex> indices = createIndices(indexDefs, dbTable, meta, databasePlatform);
+            for (IIndex index : indices.values()) {
+                dbTable.addIndex(index);
+            }
+        }
+
         ModelMetaData metaData = new ModelMetaData();
         metaData.setModelClassMetaData(list);
         metaData.init();
@@ -282,16 +289,15 @@ public class DatabaseSchema {
     }
 
     private static void createClassFieldsMetadata(Class<?> clazz, ModelClassMetaData metaData,
-        boolean includeAllFields, List<Column> columns, List<Column> pkColumns, Map<String, IIndex> indices, IDatabasePlatform platform) {
+                                                  boolean includeAllFields, List<Column> columns, List<Column> pkColumns, IDatabasePlatform platform) {
 
         Field[] fields = clazz.getDeclaredFields();
         for (Field field : fields) {
             field.setAccessible(true);
             Column column = createColumn(field, platform);
             if (column != null && (includeAllFields || column.isPrimaryKey())) {
-                createIndex(field, column, indices, metaData.getIdxPrefix());
                 if (isPrimaryKey(field)) {
-                    metaData.addEntityIdFieldMetadata(field.getName(), new FieldMetaData(clazz,field,column));
+                    metaData.addEntityIdFieldMetadata(field.getName(), new FieldMetaData(clazz, field, column));
                     metaData.addPrimaryKeyColumn(column);
                     // We want parent PK columns first. Because of this reverse ordering,
                     // primary key columns will appear in reverse order in the SQL from how they appear in the java
@@ -300,21 +306,52 @@ public class DatabaseSchema {
                 } else {
                     columns.add(column);
                 }
-                metaData.addEntityFieldMetaData(field.getName(), new FieldMetaData(clazz,field,column));
+                metaData.addEntityFieldMetaData(field.getName(), new FieldMetaData(clazz, field, column));
             }
             CompositeDef compositeDefAnnotation = field.getAnnotation(CompositeDef.class);
             if (compositeDefAnnotation != null) {
                 metaData.setIdxPrefix(compositeDefAnnotation.prefix());
-                createClassFieldsMetadata(field.getType(),metaData,includeAllFields,columns,pkColumns,indices, platform);
+                createClassFieldsMetadata(field.getType(), metaData, includeAllFields, columns, pkColumns, platform);
             }
         }
     }
 
-    private static void createIndex(Field field, Column column, Map<String, IIndex> indices, String idxPrefix) {
-        IndexDef colAnnotation = field.getAnnotation(IndexDef.class);
-        if (colAnnotation != null) {
-            String indexName = idxPrefix + "_" + colAnnotation.name();
-            boolean unique = colAnnotation.unique();
+    private static Map<String, IIndex> createIndices(IndexDefs indexDefs, Table table,
+                                                     ModelClassMetaData metaData, IDatabasePlatform platform) {
+        Map<String, IIndex> indices = new HashMap<>();
+        if (indexDefs != null && indexDefs.value() != null) {
+            for (IndexDef indexDef : indexDefs.value()) {
+                parseIndexDef(indexDef, table, indices, metaData, platform);
+            }
+        }
+
+        return indices;
+    }
+
+    private static void parseIndexDef(IndexDef indexDef, Table table, Map<String, IIndex> indices, ModelClassMetaData metaData, IDatabasePlatform platform) {
+        if (indexDef.column() != null && !indexDef.column().isEmpty()) {
+            Column column = findColumn(indexDef.column(), table, platform);
+            createIndex(indexDef, column, indexDef.column(), indices, metaData.getIdxPrefix());
+        } else if (indexDef.columns() != null && indexDef.columns().length > 0) {
+            for (String columnName : indexDef.columns()) {
+                Column column = findColumn(columnName, table, platform);
+                createIndex(indexDef, column, columnName, indices, metaData.getIdxPrefix());
+            }
+        } else {
+            log.warn("Unable to create index '{}', no columns found in definition", indexDef.name());
+        }
+    }
+
+    private static Column findColumn(String columnName, Table table, IDatabasePlatform platform) {
+        String snakeCase = alterCaseToMatchDatabaseDefaultCase(camelToSnakeCase(columnName), platform);
+        Column column = table.getColumnWithName(snakeCase);
+        return column;
+    }
+
+    private static void createIndex(IndexDef indexDef, Column column, String columnName, Map<String, IIndex> indices, String idxPrefix) {
+        if (column != null && indexDef != null) {
+            String indexName = idxPrefix != null && !idxPrefix.isEmpty() ? idxPrefix + "_" + indexDef.name() : indexDef.name();
+            boolean unique = indexDef.unique();
             indexName += (unique ? "_unq" : "");
             IIndex index = indices.get(indexName);
             if (index == null) {
@@ -323,6 +360,8 @@ public class DatabaseSchema {
                 indices.put(indexName, index);
             }
             index.addColumn(new IndexColumn(column));
+        } else {
+            log.warn("Unable to create index for column '{}', unable to find column on table", columnName);
         }
     }
 
@@ -364,10 +403,10 @@ public class DatabaseSchema {
             } else {
                 dbCol.setTypeCode(colAnnotation.type());
             }
-                       
+
             dbCol.setAutoIncrement(colAnnotation.autoIncrement());
             dbCol.setJdbcTypeName(getType(dbCol.getJdbcTypeCode()));
-            
+
             if (isNotBlank(colAnnotation.defaultValue())) {
                 dbCol.setDefaultValue(colAnnotation.defaultValue());
             }
@@ -393,7 +432,7 @@ public class DatabaseSchema {
     }
 
     public Map<String, String> getEntityIdColumnsToFields(Class<?> entityClass) {
-        @SuppressWarnings({ "rawtypes", "unchecked" })
+        @SuppressWarnings({"rawtypes", "unchecked"})
         Map<String, String> entityIdColumnsToFields = new CaseInsensitiveMap();
         List<FieldMetaData> fields = getEntityIdFields(entityClass);
         for (FieldMetaData fieldMetaData : fields) {
@@ -414,7 +453,7 @@ public class DatabaseSchema {
     }
 
     public Map<String, String> getColumnsToEntityFields(Class<?> entityClass) {
-        @SuppressWarnings({ "rawtypes", "unchecked" })
+        @SuppressWarnings({"rawtypes", "unchecked"})
         Map<String, String> entityIdColumnsToFields = new CaseInsensitiveMap();
         List<FieldMetaData> fields = getEntityFields(entityClass);
         for (FieldMetaData field : fields) {
@@ -434,7 +473,7 @@ public class DatabaseSchema {
     }
 
     public Map<String, String> getEntityFieldsToColumns(Class<?> entityClass) {
-        @SuppressWarnings({ "rawtypes", "unchecked" })
+        @SuppressWarnings({"rawtypes", "unchecked"})
         Map<String, String> entityFieldsToColumns = new CaseInsensitiveMap();
         List<FieldMetaData> fields = getEntityFields(entityClass);
         for (FieldMetaData field : fields) {
@@ -461,7 +500,7 @@ public class DatabaseSchema {
     protected List<FieldMetaData> getEntityFields(Class<?> entityClass) {
         ModelMetaData modelMetaData = classToModelMetaData.get(entityClass);
         ModelClassMetaData meta = modelMetaData != null ? modelMetaData.getModelClassMetaData().get(0) : null;
-        return meta != null ?  new ArrayList(meta.getEntityFieldMetaDatas().values()) : Collections.emptyList();
+        return meta != null ? new ArrayList(meta.getEntityFieldMetaDatas().values()) : Collections.emptyList();
     }
 
     protected static String getDefaultSize(Field field, Column column) {
@@ -493,7 +532,7 @@ public class DatabaseSchema {
                 return "OTHER";
         }
     }
-    
+
     public String getTablePrefix() {
         return tablePrefix;
     }

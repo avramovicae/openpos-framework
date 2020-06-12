@@ -1,12 +1,11 @@
 package org.jumpmind.pos.core.service;
 
-import org.jumpmind.pos.util.event.DeviceDisconnectedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.jumpmind.pos.core.flow.IStateManagerContainer;
 import org.jumpmind.pos.devices.model.DeviceModel;
 import org.jumpmind.pos.server.service.SessionConnectListener;
+import org.jumpmind.pos.util.event.DeviceDisconnectedEvent;
 import org.jumpmind.pos.util.event.EventPublisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
 import org.springframework.messaging.Message;
@@ -14,9 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 @Component
+@Slf4j
 public class SessionDisconnectedListener implements ApplicationListener<SessionDisconnectEvent> {
-
-    Logger logger = LoggerFactory.getLogger(getClass());
 
     @Autowired
     IStateManagerContainer stateManagerContainer;
@@ -31,14 +29,18 @@ public class SessionDisconnectedListener implements ApplicationListener<SessionD
     public void onApplicationEvent(SessionDisconnectEvent event) {        
         Message<?> msg = event.getMessage();
         String sessionId = (String) msg.getHeaders().get("simpSessionId");
-        logger.info("session disconnected: {}", sessionId);
+        log.info("session disconnected: {}", sessionId);
         
         DeviceModel deviceModel = sessionAuthTracker.getDeviceModel(sessionId);
 
-        try {
-            eventPublisher.publish(new DeviceDisconnectedEvent(deviceModel.getDeviceId(), deviceModel.getAppId()));
-        } catch (Exception ex) {
-            logger.warn("Error publishing DeviceDisconnectedEvent", ex);
+        if (deviceModel != null) {
+            try {
+                eventPublisher.publish(new DeviceDisconnectedEvent(deviceModel.getDeviceId(), deviceModel.getAppId()));
+            } catch (Exception ex) {
+                log.warn("Error publishing DeviceDisconnectedEvent", ex);
+            }
+        } else {
+            log.warn("No device found for session id=" + sessionId + ", not publishing DeviceDisconnectedEvent.");
         }
 
         stateManagerContainer.removeSessionIdVariables(sessionId);

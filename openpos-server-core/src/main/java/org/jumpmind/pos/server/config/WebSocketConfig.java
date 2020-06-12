@@ -57,6 +57,9 @@ public class WebSocketConfig extends AbstractWebSocketMessageBrokerConfigurer {
     @Value("${openpos.general.websocket.sendBufferSizeLimit:1000000}")
     int sendBufferSizeLimit;
 
+    @Value("${openpos.logging.messages.enabled:true}")
+    boolean loggingEnabled;
+
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         registration.setMessageSizeLimit(messageSizeLimit); // 75681
@@ -127,7 +130,7 @@ public class WebSocketConfig extends AbstractWebSocketMessageBrokerConfigurer {
             public void afterMessageHandled(Message<?> message, MessageChannel channel, MessageHandler handler, Exception ex) {
                 SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.wrap(message);
                 SimpMessageType messageType = accessor.getMessageType();
-                if (messageType == SimpMessageType.MESSAGE) {
+                if (messageType == SimpMessageType.MESSAGE && loggingEnabled) {
                     String[] tokens = accessor.getDestination().split("/");
                     setupLogging(tokens[3], tokens[5]);
                     log.info("Post send of message for session " + accessor.getSessionId() + " with destination " + accessor.getDestination() + ":\n" + new String((byte[]) message.getPayload()));

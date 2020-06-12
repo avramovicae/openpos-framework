@@ -8,7 +8,10 @@
 
 <div *ngIf="screenData.amounts && screenData.amounts.length > 0 && screenData.amountDue" responsive-class
     class="tender-amounts-outer">
-    <div *ngFor="let amount of screenData.amounts" responsive-class class="tender-amount-row tender-amount-outer">
+    <div *ngFor="let amount of screenData.amounts; let i = index;" responsive-class
+        class="tender-amount-row tender-amount-outer" [ngClass]="{'void-tender-row' : amount.voidButton}">
+        <app-icon-button *ngIf="amount.voidButton" [iconName]="amount.voidButton.icon"
+            (buttonClick)="voidTender(amount, i)"></app-icon-button>
         <div class="tender-amount-name">{{amount.name}}</div>
         <div class="tender-amount">
             <app-currency-text [amountText]="amount.amount"></app-currency-text>
@@ -22,7 +25,7 @@
     </div>
 </div>
 
-<app-dynamic-form-part *ngIf="screenData.form" [formName]="'form'" [alternateSubmitActions]="alternateSubmitActions"
+<app-dynamic-form-part *ngIf="screenData.form" [formName]="'form'" [alternateSubmitActions]="alternateSubmitActionNames"
     responsive-class class="tender-form-part"></app-dynamic-form-part>
 
 <app-instructions *ngIf="screenData.prompt" class="tender-payment-instructions" [instructions]="screenData.prompt">

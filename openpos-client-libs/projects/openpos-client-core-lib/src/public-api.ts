@@ -86,8 +86,6 @@ export * from './lib/core/oldplugins/logfile-download.plugin';
 export * from './lib/core/oldplugins/oldplugin.interface';
 export * from './lib/core/oldplugins/scan';
 
-export * from './lib/core/logging/electron-logger-config';
-
 export * from './lib/core/platform-plugins/scanners/scanner.service';
 export * from './lib/core/platform-plugins/cordova-plugins/android-content-provider-plugin';
 export * from './lib/core/messages/single-sign-on-message';
@@ -269,6 +267,7 @@ export * from './lib/shared/layout-components/waffle/waffle.component';
 export * from './lib/shared/formatters/datetime-ca.formatter';
 export * from './lib/shared/formatters/datetime.formatter';
 export * from './lib/shared/formatters/decimal.formatter';
+export * from './lib/shared/formatters/weight.formatter';
 export * from './lib/shared/formatters/do-nothing.formatter';
 export * from './lib/shared/formatters/formatter.interface';
 export * from './lib/shared/formatters/gift-code.formatter';
