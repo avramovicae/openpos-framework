@@ -726,7 +726,7 @@ public class StateManager implements IStateManager {
     }
 
     private void callGlobalActionHandler(Action action, Class<? extends Object> globalActionHandler) {
-        log.info("Calling global action handler: {}", globalActionHandler.getName());
+        log.debug("Calling global action handler: {}", globalActionHandler.getName());
 
         if (isState(globalActionHandler) && isActionHandler(globalActionHandler)) {
             throw new FlowException("Class cannot implement @OnArrive and @OnGlobalAction: " + globalActionHandler.getClass().getName());
