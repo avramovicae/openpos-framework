@@ -22,7 +22,15 @@ public class EventBroadcaster {
     }
 
     public boolean postEventToObject(Object object, Event event) {
-        return postEventToObject(object.getClass(), object, event);
+        if (object instanceof ScopeValue) {
+            ScopeValue scopeValue = (ScopeValue)object;
+            object = scopeValue.getValue();
+        }
+        if (object != null) {
+            return postEventToObject(object.getClass(), object, event);
+        } else {
+            return false;
+        }
     }
 
     public boolean postEventToObject(Class clazz, Object object, Event event) {

@@ -110,6 +110,9 @@ export class IconService {
         this.icons.set('SuspendAction', ['pause.svg', this.defaultIconProvider]);
         this.icons.set('Tax', ['account_balance.svg', this.defaultIconProvider]);
         this.icons.set('Till', ['till.svg', this.defaultIconProvider]);
+        this.icons.set('CheckRoutingSymbol', ['check-routing-symbol.svg', this.defaultIconProvider]);
+        this.icons.set('CheckAccountSymbol', ['check-account-symbol.svg', this.defaultIconProvider]);
+        this.icons.set('Number', ['pound-box.svg', this.defaultIconProvider]);
         this.icons.set('Training', ['school.svg', this.defaultIconProvider]);
         this.icons.set('Trash', ['delete.svg', this.defaultIconProvider]);
         this.icons.set('UnitedStates', ['united-states.svg', this.defaultIconProvider]);
@@ -117,6 +120,7 @@ export class IconService {
         this.icons.set('ViewAction', ['pageview.svg', this.defaultIconProvider]);
         this.icons.set('WebOrder', ['computer.svg', this.defaultIconProvider]);
         this.icons.set('AddNote', ['note_add.svg', this.defaultIconProvider]);
+        this.icons.set('License', ['picture_in_picture.svg', this.defaultIconProvider]);
     }
 
     public addIconMapping(name: string, icon: string, provider?: string) {

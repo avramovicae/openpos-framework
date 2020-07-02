@@ -220,6 +220,11 @@ public class DBSession {
         return jdbcTemplate.getJdbcOperations().batchUpdate(sql, batchArgs);
     }
 
+    public int[] executeBatchSql(String sql, List<Object[]> batchArgs, int[] argTypes) {
+        return jdbcTemplate.getJdbcOperations().batchUpdate(sql, batchArgs, argTypes);
+    }
+
+
     public int executeSql(String sql, Object... params) {
         return jdbcTemplate.getJdbcOperations().update(sql, params);
     }
@@ -273,8 +278,9 @@ public class DBSession {
         }
     }
 
-    public ModelWrapper wrap(AbstractModel model){
-       return new ModelWrapper(model, databaseSchema.getModelMetaData(model.getClass()));
+    public ModelWrapper wrap(AbstractModel model) {
+        ModelWrapper wrapper = new ModelWrapper(model, databaseSchema.getModelMetaData(model.getClass()));
+        return wrapper;
     }
 
     @SuppressWarnings("unchecked")
@@ -496,8 +502,7 @@ public class DBSession {
                 DmlStatement statement = databasePlatform.createDmlStatement(dmlType, table.getCatalog(), table.getSchema(), table.getName(),
                         primaryKeyColumns.toArray(new Column[primaryKeyColumns.size()]), model.getColumns(table), nullKeyValues, null);
                 String sql = statement.getSql();
-                Object[] values = statement.getValueArray(model.getColumnNamesToValues());
-                jdbcTemplate.getJdbcOperations().batchUpdate(sql, getValueArray(statement, models));
+                jdbcTemplate.getJdbcOperations().batchUpdate(sql, getValueArray(statement, models), model.getColumnTypes(table));
             }
         }
     }
@@ -522,6 +527,7 @@ public class DBSession {
             setMaintenanceValues(model);
             setTagValues(model);
             model.load();
+            model.loadValues();
             values.add(statement.getValueArray(model.getColumnNamesToValues()));
         });
         return values;
@@ -718,8 +724,15 @@ public class DBSession {
     }
 
     public void saveAll(List<? extends AbstractModel> entities) {
+        long ts = System.currentTimeMillis();
+        int count = 0;
         for (AbstractModel entity : entities) {
             save(entity);
+            count++;
+            if (System.currentTimeMillis() - ts > 30000) {
+                ts = System.currentTimeMillis();
+                log.info("Saved {} {} rows", count, entity.getClass().getSimpleName());
+            }
         }
     }
 

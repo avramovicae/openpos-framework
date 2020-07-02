@@ -9,9 +9,9 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.jumpmind.db.model.Column;
@@ -26,11 +26,11 @@ import org.jumpmind.pos.util.ReflectUtils;
 import org.jumpmind.pos.util.ReflectionException;
 import org.jumpmind.pos.util.model.ITypeCode;
 
+@Slf4j
 public class ModelWrapper {
-    private static Logger log = Logger.getLogger(ModelWrapper.class);
 
     public static final String ENTITY_RETRIEVAL_TIME = "entity.retrieval.time";
-    
+
     private ModelMetaData modelMetaData;
     private AbstractModel model;
     
@@ -224,7 +224,7 @@ public class ModelWrapper {
         }
     }    
 
-    protected Object getFieldValue(String fieldName) {
+    public Object getFieldValue(String fieldName) {
         Object fieldValue=null;
         Object obj = model;
 
@@ -236,9 +236,8 @@ public class ModelWrapper {
 
         try {
             fieldValue = PropertyUtils.getProperty(obj, fieldName);
-        } catch (NoSuchMethodException |
-                IllegalAccessException | InvocationTargetException ex) {
-            throw new PersistException("Failed to getFieldValue on " + obj + "fieldName " + fieldName, ex);
+        } catch (Exception ex) {
+            throw new PersistException("Failed to getFieldValue on " + obj + " fieldName " + fieldName, ex);
         }
         return fieldValue;
     }
@@ -436,6 +435,15 @@ public class ModelWrapper {
         return columnNamesToValues;
     }
 
+    public int[] getColumnTypes(Table table) {
+        Column[] columns = getColumns(table);
+        int types[] = new int[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            types[i] = columns[i].getMappedTypeCode();
+        }
+        return types;
+    }
+
     public Column[] getColumns(Table table) {
         List<Column> columns = new ArrayList<>();
         for (Column modelColumn : fieldsToColumns.values()) {
@@ -458,5 +466,23 @@ public class ModelWrapper {
             }
         }
         return equals;
+    }
+
+    public ModelMetaData getModelMetaData() {
+        return modelMetaData;
+    }
+
+    public List<Field> getPrimaryKeyFields() {
+        ModelClassMetaData classMetaData = modelMetaData.getModelClassMetaData().get(modelMetaData.getModelClassMetaData().size()-1);
+
+        Set<String> pkFieldNames = classMetaData.getPrimaryKeyFieldNames();
+
+        List<Field> pkFields = new ArrayList<>();
+
+        for (String pkFieldName : pkFieldNames) {
+            pkFields.add(classMetaData.getFieldMetaData(pkFieldName).getField());
+        }
+
+        return pkFields;
     }
 }
