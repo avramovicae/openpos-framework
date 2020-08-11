@@ -38,7 +38,7 @@ public class DefaultClientConfigSelector implements IClientConfigSelector {
         propertiesForTags.forEach(s -> {
             if (properties.containsKey(s)) {
                 String value = properties.get(s);
-                if (value != null) {
+                if (value != null && !value.equals("default")) {
                     tagsForSpecificity.add(value);
                 }
             } else {
