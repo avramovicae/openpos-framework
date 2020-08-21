@@ -1,11 +1,16 @@
 package org.jumpmind.pos.server.service;
 
-import java.util.List;
+import java.sql.Date;
+import java.time.Instant;
+import java.util.*;
 
 import javax.annotation.PostConstruct;
 
-import org.jumpmind.pos.devices.service.model.PersonalizationParameters;
+import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.jumpmind.pos.server.model.Action;
+import org.jumpmind.pos.server.model.CachedMessage;
+import org.jumpmind.pos.server.model.FetchMessage;
+import org.jumpmind.pos.util.web.NotFoundException;
 import org.jumpmind.pos.util.web.ServerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +23,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -45,15 +47,23 @@ public class MessageService implements IMessageService {
     @Value("${openpos.screens.jsonIncludeNulls:true}")
     boolean jsonIncludeNulls = true;
 
-    @Value("${openpos.general.websocket.sendBufferSizeLimit:1000000}")
+    @Value("${openpos.general.websocket.sendBufferSizeLimit:8192000}")
     int websocketSendBufferLimit;
+
+    @Value("${openpos.general.message.cacheTimeout:300000}")
+    int messageCacheTimeout;
 
     @Autowired(required=false)
     List<IActionListener> actionListeners;
 
+    private Map<String, CachedMessage> cachedMessageMap;
+
 
     @PostConstruct
     public void init() {
+
+        cachedMessageMap = Collections.synchronizedMap( new PassiveExpiringMap<>(messageCacheTimeout));
+
         if (!jsonIncludeNulls) {
             mapper.setSerializationInclusion(Include.NON_NULL);
         }
@@ -96,19 +106,42 @@ public class MessageService implements IMessageService {
 
             byte[] json = jsonString.getBytes("UTF-8");
 
-            if (jsonString.contains("\"type\" : \"UIData\"")) {
-                logger.info("Sending message to client: \n" + jsonString);
-            }
-
             if( json.length <= websocketSendBufferLimit ){
                 this.template.send(topic.toString(), MessageBuilder.withPayload(json).build());
             } else {
-                throw new RuntimeException("Message length of " + json.length + " exceeds websocket send buffer limit of " + websocketSendBufferLimit);
+                String id = UUID.randomUUID().toString();
+                String fetchMessageJson = messageToJson(FetchMessage.builder().messageIdToFetch(id).build());
+                cachedMessageMap.put(id, CachedMessage.builder().message(message).cachedTime(Date.from(Instant.now())).build());
+                this.template.send(topic.toString(), MessageBuilder.withPayload(fetchMessageJson.getBytes("UTF-8")).build());
             }
         } catch (RuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
             throw new RuntimeException("Failed to publish message for deviceId: " + deviceId + " " + message, ex);
+        }
+    }
+
+    @RequestMapping(method = RequestMethod.GET,  value = "api/app/{appId}/node/{deviceId}/message/{id}")
+    @ResponseBody
+    public String getCachedMessage(@PathVariable("appId") String appId, @PathVariable("deviceId") String deviceId, @PathVariable("id") String id){
+
+        try{
+            if(cachedMessageMap.containsKey(id)){
+                try {
+                    org.jumpmind.pos.util.model.Message m = cachedMessageMap.get(id).getMessage();
+                    cachedMessageMap.remove(id);
+                    return messageToJson(m);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException("Failed to fetch cached message" + id, e);
+                }
+            } else {
+                throw new NotFoundException();
+            }
+        } catch (Exception e){
+            Action errorAction = new Action("GlobalError", e);
+            errorAction.setType("Screen");
+            action(appId, deviceId, errorAction, null);
+            throw e;
         }
     }
     

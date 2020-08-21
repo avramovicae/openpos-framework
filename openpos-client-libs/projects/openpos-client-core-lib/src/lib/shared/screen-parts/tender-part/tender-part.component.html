@@ -1,7 +1,7 @@
 <div *ngIf="(!screenData.amounts || screenData.amounts.length === 0) && screenData.amountDue" responsive-class
     class="tender-border-color tender-amount-due-outer">
     <div responsive-class class="tender-amount-due-title">{{screenData.amountDue.name}}</div>
-    <div responsive-class class="tender-amount-due">
+    <div responsive-class class="tender-amount-due" [ngClass]="amountCss">
         <app-currency-text [amountText]="screenData.amountDue.amount"></app-currency-text>
     </div>
 </div>
@@ -32,7 +32,7 @@
 </app-instructions>
 
 <app-options-list *ngIf="screenData.optionsList" (optionClick)="doAction($event)" responsive-class
-    class="tender-options" listSize="3">
+    class="tender-options" listSize="3" [overflowPanelClass]="'tender-options'" [overflowPanelWidth]="'60vw'">
 </app-options-list>
 
 <img *ngIf="screenData.imageUrl" [src]="screenData.imageUrl | imageUrl" class="tender-payment-auth-image">

@@ -8,6 +8,10 @@
 
     app-tender-part {
 
+        .negative {
+            color: $app-warn;
+        }
+
         .tender-form-part {
             .mat-form-field {
                 @extend %text-lg;
