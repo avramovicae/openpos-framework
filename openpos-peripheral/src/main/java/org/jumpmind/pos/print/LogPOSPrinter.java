@@ -68,7 +68,6 @@ public class LogPOSPrinter implements IOpenposPrinter {
 
     @Override
     public void beginSlipMode() {
-
     }
 
     @Override
@@ -76,9 +75,16 @@ public class LogPOSPrinter implements IOpenposPrinter {
 
     }
 
+    int counter = 1;
+
     @Override
     public String readMicr() {
-        return " (1098765432( )321270742) 012547854(";
+        // fickle.
+        if (counter++ % 2 == 0) {
+            return " (1098765432( )321270742) 012547854(";
+        } else {
+            throw new PrintException("Look, I'm not a real printer.");
+        }
     }
 
     public void printSlip(String text, int timeoutInMillis) {
