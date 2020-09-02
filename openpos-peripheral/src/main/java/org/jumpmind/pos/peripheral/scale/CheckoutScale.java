@@ -19,6 +19,9 @@ import java.util.*;
 @Component
 public class CheckoutScale implements IStatusReporter {
 
+    public final static String STATUS_NAME = "DEVICE.CHECKOUT_SCALE";
+    public final static String STATUS_ICON = "checkout_scale";
+
     static final int SCALE_RESPONSE_BYTE = 0b0000010;
     static final int SCALE_ERROR_BYTE = '?';
 
@@ -29,9 +32,6 @@ public class CheckoutScale implements IStatusReporter {
     static final int STATUS_CENTER_OF_0                 = 0b0010000;
     static final int STATUS_NET_WEIGHT                  = 0b0100000;
     static final int STATUS_BAD_COMMAND                 = 0b1000000;
-
-    public final static String STATUS_NAME = "DEVICE.CHECKOUT_SCALE";
-    public final static String STATUS_ICON = "pole-display";
 
     Map<String, Object> settings;
     PeripheralConnection peripheralConnection;
@@ -60,49 +60,83 @@ public class CheckoutScale implements IStatusReporter {
         log.info("Checkout scale appears to be successfully opened.");
 
         performConfidenceTest();
+    }
 
-        ScaleWeightData weight = getScaleWeightData();
-        System.out.println(weight.getWeight());
+    protected void reconnect() {
+        if (this.peripheralConnection != null) {
+            try {
+                connectionFactory.close(peripheralConnection);
+            } catch (Exception ex) {
+                log.warn("Failed to cleanly close connection to checkout scale.", ex);
+            }
+
+            log.info("Reconnecting to checkout scale...");
+            try {
+                open(settings);
+            } catch (Exception ex) {
+                log.warn("Failed to reconnect to the checkout scale.", ex);
+            }
+        }
+
     }
 
     public ScaleWeightData getScaleWeightData() {
-        byte[] response = sendScaleCommand((byte)'W');
-        if (response.length < 2) {
-            throw new PeripheralException("Unrecognized response from checkout scale " + Arrays.toString(response));
-        }
-
-        if (response[1] == SCALE_ERROR_BYTE) {
-            String status = "";
-            byte statusByte = response[2];
-            if (statusByte > 0) {
-                status = checkStatus(statusByte);
-
-            } else {
-                performConfidenceTest();
+        try {
+            byte[] response = sendScaleCommand((byte)'W');
+            if (response.length < 2) {
+                throw new PeripheralException("Unrecognized response from checkout scale " + Arrays.toString(response));
             }
 
-            throw new PeripheralException("Failed to read checkout scale weight. " + status);
-        }
+            if (response[1] == SCALE_ERROR_BYTE) {
+                String statusMessage = "";
+                byte statusByte = response[2];
+                if (statusByte > 0) {
+                    ScaleWeightData scaleWeightData = new ScaleWeightData();
+                    scaleWeightData.setSucessful(false);
+                    statusMessage = checkStatus(scaleWeightData, statusByte);
+                    if (scaleWeightData.getFailureCode() != ScaleWeightData.CheckoutScaleFailureCode.UNSPECIFIED) {
+                        scaleWeightData.setFailureMessage(statusMessage);
+                        return scaleWeightData;
+                    }
+                } else {
+                    performConfidenceTest();
+                }
 
+                throw new PeripheralException("Failed to read checkout scale weight. " + statusMessage);
+            }
 
-        // TODO here assemble string to convert to bigdecimal
+            StringBuilder weightString = new StringBuilder();
+            for (int i = 1; i < response.length; i++) {
+                weightString.append((char)response[i]);
+            }
 
-        StringBuilder weightString = new StringBuilder();
-        for (int i = 1; i < response.length; i++) {
-            weightString.append((char)response[i]);
-        }
+            BigDecimal weight;
+            try {
+                weight = new BigDecimal(weightString.toString());
+            } catch (Exception ex) {
+                throw new PeripheralException("failed to convert scale weight to decimal: '" + weightString + "'", ex);
+            }
 
-        BigDecimal weight;
-        try {
-            weight = new BigDecimal(weightString.toString());
+            ScaleWeightData scaleWeightData = new ScaleWeightData();
+            scaleWeightData.setWeight(weight);
+            scaleWeightData.setSucessful(true);
+            if (statusManager != null) {
+                statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Online));
+            }
+            return scaleWeightData;
         } catch (Exception ex) {
-            throw new PeripheralException("failed to convert scale weight to decimal: '" + weightString + "'", ex);
+            if (statusManager != null) {
+                statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Error, ex.getMessage()));
+            }
+
+            reconnect();
+
+            if (ex instanceof PeripheralException) {
+                throw (PeripheralException)ex;
+            } else {
+                throw new PeripheralException("Failed to read weight from scale.", ex);
+            }
         }
-
-
-        ScaleWeightData scaleWeightData = new ScaleWeightData();
-        scaleWeightData.setWeight(weight);
-        return scaleWeightData;
     }
 
     protected void performConfidenceTest() {
@@ -126,6 +160,9 @@ public class CheckoutScale implements IStatusReporter {
 
     protected byte[] sendScaleCommand(byte command) {
         try {
+            if (this.peripheralConnection == null) {
+                throw new PeripheralException("The checkout scale is not open.");
+            }
             this.peripheralConnection.getOut().write(command);
             Thread.sleep(200);
 
@@ -160,30 +197,29 @@ public class CheckoutScale implements IStatusReporter {
 
     }
 
-    protected String checkStatus(int statusByte) {
+    protected String checkStatus(ScaleWeightData scaleWeightData, int statusByte) {
 
         StringBuilder buff = new StringBuilder();
 
         buff.append("Checkout Scale Status: ");
 
-        System.out.println();
         if ((statusByte & STATUS_NET_WEIGHT) > 0) {
             buff.append("(net weight)");
         }
         if ((statusByte & STATUS_SCALE_IN_MOTION) > 0) {
             buff.append("(The scale in motion)");
+            scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_IN_MOTION);
         }
         if ((statusByte & STATUS_OVER_CAPACITY) > 0) {
             buff.append("(The Scale is over capacity)");
+            scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_OVER_CAPACITY);
         }
         if ((statusByte & STATUS_UNDER_0) > 0) {
             buff.append("(The scale is reading under 0)");
+            scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_READ_UNDER_0);
         }
         if ((statusByte & STATUS_OUTSIDE_ZERO_CAPTURE_RANGE) > 0) {
             buff.append("(The scale outside zero capture range)");
-        }
-        if ((statusByte & STATUS_BAD_COMMAND) > 0) {
-//            buff.append("[Bad command]");
         }
         if ((statusByte & STATUS_CENTER_OF_0) > 0) {
             buff.append("(Scale center of 0)");
@@ -192,16 +228,22 @@ public class CheckoutScale implements IStatusReporter {
         buff.append(" 0b").append(Integer.toBinaryString(statusByte));
 
         return buff.toString();
-
-
     }
 
 
     @Override
     public StatusReport getStatus(IStatusManager statusManager) {
-        StatusReport statusReport = new StatusReport();
-        statusReport.setStatus(Status.Disabled);
-        return statusReport;
+        this.statusManager = statusManager;
+
+        Status status = (peripheralConnection != null && peripheralConnection.getOut() != null)
+                ? Status.Online : Status.Offline;
+
+        if (this.settings == null) {
+            status = Status.Disabled;
+        }
+
+        StatusReport report = new StatusReport(STATUS_NAME, STATUS_ICON, status);
+        return report;
     }
 
     public static void main(String[] args) {
