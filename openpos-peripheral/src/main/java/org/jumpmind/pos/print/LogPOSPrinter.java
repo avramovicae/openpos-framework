@@ -79,12 +79,7 @@ public class LogPOSPrinter implements IOpenposPrinter {
 
     @Override
     public String readMicr() {
-        // fickle.
-        if (counter++ % 2 == 0) {
-            return " (1098765432( )321270742) 012547854(";
-        } else {
-            throw new PrintException("Look, I'm not a real printer.");
-        }
+        return " (1098765432( )321270742) 012547854(";
     }
 
     public void printSlip(String text, int timeoutInMillis) {
