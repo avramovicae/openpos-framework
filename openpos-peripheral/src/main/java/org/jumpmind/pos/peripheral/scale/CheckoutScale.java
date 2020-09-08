@@ -12,6 +12,7 @@ import org.jumpmind.pos.util.status.Status;
 import org.jumpmind.pos.util.status.StatusReport;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PreDestroy;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -32,6 +33,8 @@ public class CheckoutScale implements IStatusReporter {
     static final int STATUS_CENTER_OF_0                 = 0b0010000;
     static final int STATUS_NET_WEIGHT                  = 0b0100000;
     static final int STATUS_BAD_COMMAND                 = 0b1000000;
+
+    final static char TARE_CHARACTER = 'N';
 
     Map<String, Object> settings;
     PeripheralConnection peripheralConnection;
@@ -69,18 +72,28 @@ public class CheckoutScale implements IStatusReporter {
             } catch (Exception ex) {
                 log.warn("Failed to cleanly close connection to checkout scale.", ex);
             }
-
-            log.info("Reconnecting to checkout scale...");
-            try {
-                open(settings);
-            } catch (Exception ex) {
-                log.warn("Failed to reconnect to the checkout scale.", ex);
-            }
         }
 
+        log.info("Reconnecting to checkout scale...");
+        try {
+            open(settings);
+        } catch (Exception ex) {
+            log.warn("Failed to reconnect to the checkout scale.", ex);
+        }
     }
 
-    public ScaleWeightData getScaleWeightData() {
+    @PreDestroy
+    public void destroy() {
+        if (this.peripheralConnection != null) {
+            try {
+                connectionFactory.close(peripheralConnection);
+            } catch (Exception ex) {
+                log.warn("Failed to cleanly close connection to checkout scale.", ex);
+            }
+        }
+    }
+
+    public synchronized ScaleWeightData getScaleWeightData() {
         try {
             byte[] response = sendScaleCommand((byte)'W');
             if (response.length < 2) {
@@ -112,6 +125,9 @@ public class CheckoutScale implements IStatusReporter {
 
             BigDecimal weight;
             try {
+                if (weightString.charAt(weightString.length()-1) == TARE_CHARACTER) { // not sure how to act on this tare character yet.
+                   weightString.setLength(weightString.length()-1);
+                }
                 weight = new BigDecimal(weightString.toString());
             } catch (Exception ex) {
                 throw new PeripheralException("failed to convert scale weight to decimal: '" + weightString + "'", ex);
@@ -164,7 +180,12 @@ public class CheckoutScale implements IStatusReporter {
                 throw new PeripheralException("The checkout scale is not open.");
             }
             this.peripheralConnection.getOut().write(command);
-            Thread.sleep(200);
+            try {
+                Thread.sleep(200);
+            } catch (Exception ex) {
+                log.debug("sendScaleCommand interruppted", ex);
+            }
+
 
             List<Integer> bytes = new ArrayList<Integer>();
 
@@ -198,31 +219,28 @@ public class CheckoutScale implements IStatusReporter {
     }
 
     protected String checkStatus(ScaleWeightData scaleWeightData, int statusByte) {
-
         StringBuilder buff = new StringBuilder();
-
-        buff.append("Checkout Scale Status: ");
 
         if ((statusByte & STATUS_NET_WEIGHT) > 0) {
             buff.append("(net weight)");
         }
         if ((statusByte & STATUS_SCALE_IN_MOTION) > 0) {
-            buff.append("(The scale in motion)");
+            buff.append("The scale is in motion.");
             scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_IN_MOTION);
         }
         if ((statusByte & STATUS_OVER_CAPACITY) > 0) {
-            buff.append("(The Scale is over capacity)");
+            buff.append("The scale is over capacity");
             scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_OVER_CAPACITY);
         }
         if ((statusByte & STATUS_UNDER_0) > 0) {
-            buff.append("(The scale is reading under 0)");
+            buff.append("The scale is reading under 0");
             scaleWeightData.setFailureCode(ScaleWeightData.CheckoutScaleFailureCode.SCALE_READ_UNDER_0);
         }
         if ((statusByte & STATUS_OUTSIDE_ZERO_CAPTURE_RANGE) > 0) {
-            buff.append("(The scale outside zero capture range)");
+            buff.append("The scale is outside zero capture range");
         }
         if ((statusByte & STATUS_CENTER_OF_0) > 0) {
-            buff.append("(Scale center of 0)");
+            buff.append("The scale center of 0");
         }
 
         buff.append(" 0b").append(Integer.toBinaryString(statusByte));
@@ -247,6 +265,7 @@ public class CheckoutScale implements IStatusReporter {
     }
 
     public static void main(String[] args) {
+        // 360018794
         CheckoutScale scale = new CheckoutScale();
         Map<String, Object> settings = new HashMap<>();
 

@@ -13,6 +13,7 @@ import org.jumpmind.pos.util.status.Status;
 import org.jumpmind.pos.util.status.StatusReport;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PreDestroy;
 import java.util.Map;
 
 @Slf4j
@@ -87,5 +88,16 @@ public class PoleDisplay implements IStatusReporter {
 
         StatusReport report = new StatusReport(STATUS_NAME, STATUS_ICON, status);
         return report;
+    }
+
+    @PreDestroy
+    public void destroy() {
+        if (this.peripheralConnection != null) {
+            try {
+                connectionFactory.close(peripheralConnection);
+            } catch (Exception ex) {
+                log.warn("Failed to cleanly close connection to the pole display.", ex);
+            }
+        }
     }
 }
