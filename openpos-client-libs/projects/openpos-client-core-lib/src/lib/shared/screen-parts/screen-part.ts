@@ -14,6 +14,7 @@ import {LifeCycleTypeGuards} from '../../core/life-cycle-interfaces/lifecycle-ty
 import {MessageTypes} from '../../core/messages/message-types';
 import {ActionService} from '../../core/actions/action.service';
 import {KeyPressProvider} from '../providers/keypress.provider';
+import { IScreenValueUpdate } from './screen-value-update/screen-value-update.interface';
 
 export abstract class ScreenPartComponent<T> implements OnDestroy, OnInit {
     destroyed$ = new Subject();
@@ -69,6 +70,10 @@ export abstract class ScreenPartComponent<T> implements OnDestroy, OnInit {
         this.subscriptions.add(this.messageProvider.getAllMessages$().pipe(
             filter( message => message.type === MessageTypes.LIFE_CYCLE_EVENT )
         ).subscribe( message => this.handleLifeCycleEvent(message as LifeCycleMessage)));
+
+        this.subscriptions.add(this.messageProvider.getAllMessages$().pipe(
+            filter( message => message.type === MessageTypes.SCREEN_VALUE_UPDATE )
+        ).subscribe( message => this.handleScreenValueUpdate(message)));
     }
     ngOnDestroy(): void {
         this.subscriptions.unsubscribe();
@@ -100,6 +105,22 @@ export abstract class ScreenPartComponent<T> implements OnDestroy, OnInit {
                 }
                 break;
         }
+    }
+
+    private handleScreenValueUpdate( message: any ) {
+        console.log('GOT screen value update ' + message.value);
+
+
+        if (this.screenData['responseText'] !== undefined) {
+            console.log("******************************************************");
+            console.log('UPDATING responseText ' + message.value);
+            this.screenData['responseText'] = message.value;
+            this.screenData['placeholderText'] = message.value;
+            console.log(this.screenPartName);
+        }
+        
+        console.log(this.screenData);
+        
     }
 
     abstract screenDataUpdated();
