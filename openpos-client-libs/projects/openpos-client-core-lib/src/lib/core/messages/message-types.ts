@@ -15,5 +15,5 @@ export class MessageTypes {
     static STARTUP = 'Startup';
     static PRINT = 'Print';
     static FETCH = 'Fetch';
-    static SCREEN_VALUE_UPDATE = "ScreenValueUpdate";
+    static SCREEN_VALUE_UPDATE = 'ScreenValueUpdate';
 }

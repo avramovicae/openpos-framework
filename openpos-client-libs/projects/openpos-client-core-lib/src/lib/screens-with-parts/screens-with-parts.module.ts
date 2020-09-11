@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 import {AutoCompleteAddressDialogComponent} from './auto-complete-address/auto-complete-address-dialog.component';
+import {DigitalReadingComponent} from './digital-reading/digital-reading.component';
 
 import { SelectionListScreenComponent } from './selection-list/selection-list-screen.component';
 import { SelectionListScreenDialogComponent } from './selection-list/selection-list-screen-dialog.component';
@@ -69,7 +70,8 @@ const dialogs = [
     DynamicFormDialogComponent,
     ScanInputDialogComponent,
     AutoCompleteAddressDialogComponent,
-    ErrorDialogComponent
+    ErrorDialogComponent,
+    DigitalReadingComponent
 ];
 
 @NgModule({

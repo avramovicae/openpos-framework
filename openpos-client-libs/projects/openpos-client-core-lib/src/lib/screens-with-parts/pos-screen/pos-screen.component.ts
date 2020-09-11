@@ -1,14 +1,20 @@
+import {filter, map} from 'rxjs/operators';
 import {IAbstractScreen} from '../../core/interfaces/abstract-screen.interface';
+import {OpenposMessage} from '../../core/messages/message';
+import {MessageTypes} from '../../core/messages/message-types';
+import {ScreenValueUpdateMessage} from '../../core/messages/screen-value-update-message';
+import {SessionService} from '../../core/services/session.service';
 import {IScreen} from '../../shared/components/dynamic-screen/screen.interface';
 import {deepAssign} from '../../utilites/deep-assign';
 import {IActionItem} from '../../core/actions/action-item.interface';
 import {Injector, OnDestroy, Optional} from '@angular/core';
 import {ActionService} from '../../core/actions/action.service';
-import {Subject, Subscription} from 'rxjs';
+import {Observable, Subject, Subscription} from 'rxjs';
 
 export abstract class PosScreen<T extends IAbstractScreen> implements IScreen, OnDestroy {
     screen: T;
     actionService: ActionService;
+    sessionService: SessionService;
 
     subscriptions = new Subscription();
     destroyed$ = new Subject();
@@ -19,6 +25,7 @@ export abstract class PosScreen<T extends IAbstractScreen> implements IScreen, O
         // This should never happen, but just incase lets make sure its not null or undefined
         if ( !!injector ) {
             this.actionService = injector.get(ActionService);
+            this.sessionService = injector.get(SessionService);
         }
     }
 
@@ -33,6 +40,13 @@ export abstract class PosScreen<T extends IAbstractScreen> implements IScreen, O
         } else {
             this.actionService.doAction(action, payload);
         }
+    }
+
+    getValueUpdates<T>(path: string): Observable<T>{
+        return this.sessionService.getMessages(MessageTypes.SCREEN_VALUE_UPDATE).pipe(
+            filter( m => (m as ScreenValueUpdateMessage<T>).valuePath === path ),
+            map( m => (m as ScreenValueUpdateMessage<T>).value)
+        );
     }
 
     ngOnDestroy(): void {
