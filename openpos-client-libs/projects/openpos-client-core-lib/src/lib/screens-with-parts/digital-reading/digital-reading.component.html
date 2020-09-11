@@ -3,7 +3,7 @@
     <div class="prompt-body">
         <div class="message">{{message$ | async}}</div>
         <app-icon class="icon" [iconName]="screen.icon"></app-icon>
-        <div>{{value$ | async}}</div>
+        <div class="value">{{value$ | async}}</div>
     </div>
-    <app-primary-button (buttonClick)="doAction(screen.button)">{{screen.button.title}}</app-primary-button>
+    <app-primary-button class="button" (buttonClick)="doAction(screen.button)">{{screen.button.title}}</app-primary-button>
 </div>
