@@ -19,6 +19,7 @@ import { LoadingDialogComponent } from './loading-dialog/loading-dialog.componen
 import { PromptWithInfoScreenComponent } from './prompt-with-info/prompt-with-info-screen.component';
 import { PromptWithInfoScreenDialogComponent } from './prompt-with-info/prompt-with-info-screen-dialog.component';
 import { DataTableComponent } from './data-table/data-table.component';
+import { DataTableDialogComponent } from './data-table/data-table-dialog.component';
 import { AutoCompleteAddressComponent } from './auto-complete-address/auto-complete-address.component';
 import { SaleComponent } from './sale/sale.component';
 import { ItemDetailComponent } from './item-detail/item-detail.component';
@@ -31,7 +32,7 @@ import { MobileReturnReceiptsSheetComponent } from './return/mobile-return-recei
 import { OptionsScreenComponent } from './options/options-screen.component';
 import { OptionsScreenDialogComponent } from './options/options-screen-dialog.component';
 import { MobileSaleOrdersSheetComponent } from './sale/mobile-sale-orders-sheet/mobile-sale-orders-sheet.component';
-import {ErrorDialogComponent} from "./error-dialog/error-dialog.component";
+import {ErrorDialogComponent} from './error-dialog/error-dialog.component';
 import { TransactionSearchComponent } from './transaction-search/transaction-search.component';
 import { TransactionDetailsComponent } from './transaction-details/transaction-details.component';
 
@@ -71,7 +72,8 @@ const dialogs = [
     ScanInputDialogComponent,
     AutoCompleteAddressDialogComponent,
     ErrorDialogComponent,
-    DigitalReadingComponent
+    DigitalReadingComponent,
+    DataTableDialogComponent
 ];
 
 @NgModule({

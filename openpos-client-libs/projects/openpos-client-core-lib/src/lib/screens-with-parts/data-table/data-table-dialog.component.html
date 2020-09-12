@@ -1,13 +1,13 @@
 <div class="data-table-outer">
-    <app-bacon-strip></app-bacon-strip>
+    <app-dialog-header></app-dialog-header>
     <div class="data-table-body" responsive-class>
-        <app-instructions *ngIf="screen.instructions" class="text-center" [instructions]="screen.instructions" [instructionsSize]="'text-md'"></app-instructions>
+        <app-instructions *ngIf="screen.instructions" [instructions]="screen.instructions" [instructionsSize]="'text-sm'"></app-instructions>
         <app-content-card>
-            <div class="content">
+            <mat-dialog-content class="dialog-content">
                 <app-grid-table [rows]="rows" [columnHeaders]="columnHeaders"></app-grid-table>
-            </div>
+            </mat-dialog-content>
         </app-content-card>
-        <section class="buttons">
+        <mat-dialog-actions class="buttons">
             <div *ngFor="let m of screen.actionButtons;  let i = index">
                 <app-secondary-button *ngIf="screen.actionButtons.length-1 !== i"
                     [actionItem]="m" (actionClick)="doAction(m)" (click)="doAction(m)">
@@ -21,6 +21,6 @@
                     <span *ngIf="keybindsEnabled(m)" class="muted-color">{{m.keybindDisplayName}}</span>
                 </app-primary-button>
             </div>
-        </section>
+        </mat-dialog-actions>
     </div>
 </div>
