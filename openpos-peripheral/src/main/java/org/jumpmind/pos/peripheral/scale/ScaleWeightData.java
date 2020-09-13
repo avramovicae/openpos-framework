@@ -1,11 +1,13 @@
 package org.jumpmind.pos.peripheral.scale;
 
 import lombok.Data;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 
 
 @Data
+@ToString
 public class ScaleWeightData {
 
     public static enum CheckoutScaleUnit {

@@ -108,19 +108,9 @@ export abstract class ScreenPartComponent<T> implements OnDestroy, OnInit {
     }
 
     private handleScreenValueUpdate( message: any ) {
-        console.log('GOT screen value update ' + message.value);
-
-
-        if (this.screenData['responseText'] !== undefined) {
-            console.log("******************************************************");
-            console.log('UPDATING responseText ' + message.value);
-            this.screenData['responseText'] = message.value;
-            this.screenData['placeholderText'] = message.value;
-            console.log(this.screenPartName);
+        if (this.screenData[message.valuePath] !== undefined) {
+            this.screenData[message.valuePath] = message.value;
         }
-        
-        console.log(this.screenData);
-        
     }
 
     abstract screenDataUpdated();
