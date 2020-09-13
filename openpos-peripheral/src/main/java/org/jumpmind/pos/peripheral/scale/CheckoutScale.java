@@ -41,6 +41,7 @@ public class CheckoutScale implements IStatusReporter {
     IConnectionFactory connectionFactory;
 
     IStatusManager statusManager;
+    private Status lastStatus = Status.Unknown;
 
     public void initialize(Map<String,Object> settings) {
         this.settings = settings;
@@ -49,6 +50,9 @@ public class CheckoutScale implements IStatusReporter {
     }
 
     void open(Map<String,Object> settings, boolean runConfidenceTest) {
+        if (this.peripheralConnection != null) {
+            throw new PeripheralException("peripheralConnection should be null when open is called. Scale might already be open.");
+        }
         try {
             String className = (String)this.settings.get("connectionClass");
             if (StringUtils.isEmpty(className)) {
@@ -56,19 +60,28 @@ public class CheckoutScale implements IStatusReporter {
             }
             this.connectionFactory = ClassUtils.instantiate(className);
         } catch (Exception ex) {
+            lastStatus = Status.Offline;
             if (statusManager != null) {
-                statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Offline, ex.getMessage()));
+                statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, lastStatus, ex.getMessage()));
             }
             throw new PeripheralException("Failed to create the connection factory for " + getClass().getName(), ex);
         }
-        log.info("Opening checkout scale with settings: " + this.settings);
 
-        this.peripheralConnection = connectionFactory.open(this.settings);
+        try {
+            log.info("Opening checkout scale with settings: " + this.settings);
+            this.peripheralConnection = connectionFactory.open(this.settings);
+            log.info("Checkout scale appears to be successfully opened.");
 
-        log.info("Checkout scale appears to be successfully opened.");
-
-        if (runConfidenceTest) {
-            performConfidenceTest();
+            if (runConfidenceTest) {
+                performConfidenceTest();
+            }
+        } catch (Exception ex) {
+            this.peripheralConnection = null;
+            lastStatus = Status.Offline;
+            if (statusManager != null) {
+                statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, lastStatus, ex.getMessage()));
+            }
+            throw new PeripheralException("Failed to open connecto to the checkout scale.", ex);
         }
     }
 
@@ -140,11 +153,13 @@ public class CheckoutScale implements IStatusReporter {
             ScaleWeightData scaleWeightData = new ScaleWeightData();
             scaleWeightData.setWeight(weight);
             scaleWeightData.setSucessful(true);
+            lastStatus = Status.Online;
             if (statusManager != null) {
                 statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Online));
             }
             return scaleWeightData;
         } catch (Exception ex) {
+            lastStatus = Status.Error;
             if (statusManager != null) {
                 statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Error, ex.getMessage()));
             }
@@ -188,7 +203,6 @@ public class CheckoutScale implements IStatusReporter {
             } catch (Exception ex) {
                 log.debug("sendScaleCommand interruppted", ex);
             }
-
 
             List<Integer> bytes = new ArrayList<Integer>();
 
@@ -255,8 +269,7 @@ public class CheckoutScale implements IStatusReporter {
     public StatusReport getStatus(IStatusManager statusManager) {
         this.statusManager = statusManager;
 
-        Status status = (peripheralConnection != null && peripheralConnection.getOut() != null)
-                ? Status.Online : Status.Offline;
+        Status status = lastStatus;
 
         if (this.settings == null) {
             status = Status.Disabled;
@@ -290,4 +303,4 @@ public class CheckoutScale implements IStatusReporter {
 
 
     }
-}
+            }
