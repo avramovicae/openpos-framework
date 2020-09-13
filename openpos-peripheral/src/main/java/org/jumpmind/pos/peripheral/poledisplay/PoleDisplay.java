@@ -55,15 +55,14 @@ public class PoleDisplay implements IStatusReporter {
         log.info("Pole display appears to be successfully opened.");
     }
 
-    public void close() {
-        this.connectionFactory.close(peripheralConnection);
-    }
-
     public void showText(String text) {
         try {
             if (peripheralConnection == null || peripheralConnection.getOut() == null) {
                 log.warn("Not connected to pole display to show text: " + text);
                 this.peripheralConnection = connectionFactory.open(this.settings);
+            }
+            if (log.isDebugEnabled()) {
+                log.debug("Displaying to pole display: '" + text + "'");
             }
             peripheralConnection.getOut().write(CLEAR_DISPLAY);
             peripheralConnection.getOut().write(text.getBytes());
@@ -91,10 +90,12 @@ public class PoleDisplay implements IStatusReporter {
     }
 
     @PreDestroy
-    public void destroy() {
+    public void close() {
         if (this.peripheralConnection != null) {
             try {
+                log.info("Closing connection to the pole display.");
                 connectionFactory.close(peripheralConnection);
+                peripheralConnection = null;
             } catch (Exception ex) {
                 log.warn("Failed to cleanly close connection to the pole display.", ex);
             }

@@ -35,10 +35,10 @@ public class RS232ConnectionFactory implements IConnectionFactory {
         try {
             CommPortIdentifier portIdentifier = CommPortIdentifier.getPortIdentifier(portName);
             PeripheralConnection connection = openSerialPort(settings, portIdentifier);
-            log.info("Successfully connected to port " + portName + " for printing.");
+            log.info("Successfully connected to port " + portName);
             return connection;
         } catch (Exception ex) {
-            throw new PrintException("Failed to open serial port for printing " + portName + " settings=" + settings, ex);
+            throw new PrintException("Failed to open serial port " + portName + " settings=" + settings, ex);
         }
 
 

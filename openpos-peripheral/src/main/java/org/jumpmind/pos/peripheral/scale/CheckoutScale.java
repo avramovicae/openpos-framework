@@ -42,8 +42,13 @@ public class CheckoutScale implements IStatusReporter {
 
     IStatusManager statusManager;
 
-    public void open(Map<String,Object> settings) {
+    public void initialize(Map<String,Object> settings) {
         this.settings = settings;
+        open(settings, true);
+        close();
+    }
+
+    void open(Map<String,Object> settings, boolean runConfidenceTest) {
         try {
             String className = (String)this.settings.get("connectionClass");
             if (StringUtils.isEmpty(className)) {
@@ -58,35 +63,22 @@ public class CheckoutScale implements IStatusReporter {
         }
         log.info("Opening checkout scale with settings: " + this.settings);
 
-//        this.peripheralConnection = connectionFactory.open(this.settings);
+        this.peripheralConnection = connectionFactory.open(this.settings);
 
         log.info("Checkout scale appears to be successfully opened.");
 
-//        performConfidenceTest();
-    }
-
-    protected void reconnect() {
-        if (this.peripheralConnection != null) {
-            try {
-                connectionFactory.close(peripheralConnection);
-            } catch (Exception ex) {
-                log.warn("Failed to cleanly close connection to checkout scale.", ex);
-            }
-        }
-
-        log.info("Reconnecting to checkout scale...");
-        try {
-            open(settings);
-        } catch (Exception ex) {
-            log.warn("Failed to reconnect to the checkout scale.", ex);
+        if (runConfidenceTest) {
+            performConfidenceTest();
         }
     }
 
     @PreDestroy
-    public void destroy() {
+    public void close() {
         if (this.peripheralConnection != null) {
             try {
+                log.info("Closing connection to checkout scale.");
                 connectionFactory.close(peripheralConnection);
+                this.peripheralConnection = null;
             } catch (Exception ex) {
                 log.warn("Failed to cleanly close connection to checkout scale.", ex);
             }
@@ -94,14 +86,18 @@ public class CheckoutScale implements IStatusReporter {
     }
 
     public synchronized ScaleWeightData getScaleWeightData() {
-        if (true) {
-            ScaleWeightData weight = new ScaleWeightData();
-            String time = String.valueOf(System.currentTimeMillis());
-            int length = time.length();
-            weight.setWeight(new BigDecimal("28." + time.substring(length-1, length)));
-            weight.setSucessful(true);
-            return weight;
+        if (this.settings != null) {
+            open(this.settings, false);
         }
+
+//        if (true) {
+//            ScaleWeightData weight = new ScaleWeightData();
+//            String time = String.valueOf(System.currentTimeMillis());
+//            int length = time.length();
+//            weight.setWeight(new BigDecimal("28." + time.substring(length-1, length)));
+//            weight.setSucessful(true);
+//            return weight;
+//        }
         try {
             byte[] response = sendScaleCommand((byte)'W');
             if (response.length < 2) {
@@ -152,14 +148,13 @@ public class CheckoutScale implements IStatusReporter {
             if (statusManager != null) {
                 statusManager.reportStatus(new StatusReport(STATUS_NAME, STATUS_ICON, Status.Error, ex.getMessage()));
             }
-
-            reconnect();
-
             if (ex instanceof PeripheralException) {
                 throw (PeripheralException)ex;
             } else {
                 throw new PeripheralException("Failed to read weight from scale.", ex);
             }
+        } finally {
+            close();
         }
     }
 
@@ -256,7 +251,6 @@ public class CheckoutScale implements IStatusReporter {
         return buff.toString();
     }
 
-
     @Override
     public StatusReport getStatus(IStatusManager statusManager) {
         this.statusManager = statusManager;
@@ -272,13 +266,28 @@ public class CheckoutScale implements IStatusReporter {
         return report;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         // 360018794
         CheckoutScale scale = new CheckoutScale();
         Map<String, Object> settings = new HashMap<>();
 
         settings.put("connectionClass", RS232ConnectionFactory.class.getName());
         settings.put("portName", "COM6");
-        scale.open(settings);
+        scale.initialize(settings);
+
+        int tries = 200;
+        while (tries-- > 0) {
+            System.out.println("Waiting...");
+            Thread.sleep(10000);
+            ScaleWeightData weightData = scale.getScaleWeightData();
+            if (weightData.isSucessful()) {
+                System.out.println("Read weight: " + weightData.getWeight());
+            } else {
+                System.out.println("Failed: " + weightData.getFailureMessage());
+            }
+        }
+
+
+
     }
 }
