@@ -4,8 +4,7 @@
 
 .prompt-outer {
   display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   height: 100%;
 
   .prompt-body {
