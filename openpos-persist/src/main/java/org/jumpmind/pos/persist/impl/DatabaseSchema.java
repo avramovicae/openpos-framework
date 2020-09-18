@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.SneakyThrows;
 import org.apache.commons.collections4.map.CaseInsensitiveMap;
@@ -28,6 +29,8 @@ import org.jumpmind.db.platform.IDatabasePlatform;
 import org.jumpmind.db.platform.IDdlBuilder;
 import org.jumpmind.db.sql.SqlScript;
 import org.jumpmind.pos.persist.*;
+import org.jumpmind.pos.persist.model.AugmenterConfig;
+import org.jumpmind.pos.persist.model.AugmenterHelper;
 import org.jumpmind.pos.util.model.ITypeCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,13 +46,15 @@ public class DatabaseSchema {
     private Database desiredModel;
     private static ModelValidator modelClassValidator = new ModelValidator();
     private String tablePrefix;
+    private AugmenterHelper augmenterHelper;
 
     @SneakyThrows
-    public void init(String tablePrefix, IDatabasePlatform platform, List<Class<?>> entityClasses, List<Class<?>> entityExtensionClasses) {
+    public void init(String tablePrefix, IDatabasePlatform platform, List<Class<?>> entityClasses, List<Class<?>> entityExtensionClasses, AugmenterHelper augmenterHelper) {
         this.platform = platform;
         this.tablePrefix = tablePrefix;
         this.entityClasses = entityClasses;
         this.entityExtensionClasses = entityExtensionClasses;
+        this.augmenterHelper = augmenterHelper;
         desiredModel = buildDesiredModel();
     }
 
@@ -492,8 +497,25 @@ public class DatabaseSchema {
                 entityIdColumnsToFields.put(columnName, field.getField().getName());
             }
         }
+        Map<String, String> augmentedColumnsToFields = getAugmentedColumnsToFields(entityClass);
+        Map<String, String> mergedMaps = Stream.concat(entityIdColumnsToFields.entrySet().stream(), augmentedColumnsToFields.entrySet().stream())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (value1, value2) -> value1,
+                        CaseInsensitiveMap::new));
+        return mergedMaps;
+    }
 
-        return entityIdColumnsToFields;
+    private Map<String, String> getAugmentedColumnsToFields(Class<?> entityClass) {
+        Map<String, String> columnsToAugmentedFields = new CaseInsensitiveMap<>();
+        AugmenterConfig config = augmenterHelper.getAugmenterConfig(entityClass);
+        if (config != null) {
+            for (String augmenterName: config.getAugmenterNames()) {
+                columnsToAugmentedFields.put(config.getPrefix() + camelToSnakeCase(augmenterName), augmenterName);
+            }
+        }
+        return columnsToAugmentedFields;
     }
 
     public Map<String, String> getEntityFieldsToColumns(Class<?> entityClass) {

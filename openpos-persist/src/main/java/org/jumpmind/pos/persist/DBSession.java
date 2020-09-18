@@ -29,10 +29,7 @@ import org.jumpmind.db.sql.DmlStatement.DmlType;
 import org.jumpmind.db.sql.LogSqlBuilder;
 import org.jumpmind.db.sql.Row;
 import org.jumpmind.pos.persist.impl.*;
-import org.jumpmind.pos.persist.model.ITaggedModel;
-import org.jumpmind.pos.persist.model.SearchCriteria;
-import org.jumpmind.pos.persist.model.TagHelper;
-import org.jumpmind.pos.persist.model.TagModel;
+import org.jumpmind.pos.persist.model.*;
 import org.jumpmind.pos.util.ReflectUtils;
 import org.jumpmind.pos.util.model.ITypeCode;
 import org.jumpmind.properties.TypedProperties;
@@ -57,10 +54,11 @@ public class DBSession {
     private Map<String, QueryTemplate> queryTemplates;
     private Map<String, DmlTemplate> dmlTemplates;
     private TagHelper tagHelper;
+    private AugmenterHelper augmenterHelper;
 
     public DBSession(String catalogName, String schemaName, DatabaseSchema databaseSchema, IDatabasePlatform databasePlatform,
                      TypedProperties sessionContext, Map<String, QueryTemplate> queryTemplates, Map<String, DmlTemplate> dmlTemplates,
-                     TagHelper tagHelper) {
+                     TagHelper tagHelper, AugmenterHelper augmenterHelper) {
         super();
         this.dmlTemplates = dmlTemplates;
         this.databaseSchema = databaseSchema;
@@ -72,6 +70,7 @@ public class DBSession {
         this.jdbcTemplate = new NamedParameterJdbcTemplate(baseTemplate);
         this.queryTemplates = queryTemplates;
         this.tagHelper = tagHelper;
+        this.augmenterHelper = augmenterHelper;
     }
 
     public <T extends AbstractModel> List<T> findAll(Class<T> clazz, int maxResults) {
@@ -283,7 +282,7 @@ public class DBSession {
     }
 
     public ModelWrapper wrap(AbstractModel model) {
-        ModelWrapper wrapper = new ModelWrapper(model, databaseSchema.getModelMetaData(model.getClass()));
+        ModelWrapper wrapper = new ModelWrapper(model, databaseSchema.getModelMetaData(model.getClass()), augmenterHelper);
         return wrapper;
     }
 
@@ -398,7 +397,8 @@ public class DBSession {
             for (String property: queryParamKeys) {
                 boolean isPropertyMapped = entityModelClasses.stream().anyMatch(modelClass -> {
                     ModelMetaData modelMetaData = this.databaseSchema.getModelMetaData(modelClass);
-                    return modelMetaData.getColumnNameForProperty(modelClass, property) != null;
+                    return modelMetaData.getColumnNameForProperty(modelClass, property) != null ||
+                            isAugmentedProperty(modelClass, property);
                 });
 
                 if (! isPropertyMapped) {
@@ -414,12 +414,16 @@ public class DBSession {
         }
     }
 
+    private boolean isAugmentedProperty(Class<?> modelClass, String property) {
+        AugmenterConfig config = augmenterHelper.getAugmenterConfig(modelClass);
+        return config != null && config.getAugmenter(property) != null;
+    }
 
     public void save(AbstractModel argModel) {
         List<Table> tables = getValidatedTables(argModel);
 
         ModelWrapper model =
-                new ModelWrapper(argModel, databaseSchema.getModelMetaData(argModel.getClass()));
+                new ModelWrapper(argModel, databaseSchema.getModelMetaData(argModel.getClass()), augmenterHelper);
 
         setMaintenanceValues(model);
         setTagValues(model);
@@ -452,7 +456,7 @@ public class DBSession {
         List<Table> tables = getValidatedTables(argModel);
 
         ModelWrapper model =
-                new ModelWrapper(argModel, databaseSchema.getModelMetaData(argModel.getClass()));
+                new ModelWrapper(argModel, databaseSchema.getModelMetaData(argModel.getClass()), augmenterHelper);
 
         model.load();
         model.loadValues();
@@ -493,7 +497,7 @@ public class DBSession {
         if (models.size() > 0) {
             AbstractModel exampleModel = models.get(0);
 
-            ModelWrapper model = new ModelWrapper(exampleModel, databaseSchema.getModelMetaData(exampleModel.getClass()));
+            ModelWrapper model = new ModelWrapper(exampleModel, databaseSchema.getModelMetaData(exampleModel.getClass()), augmenterHelper);
             setMaintenanceValues(model);
             setTagValues(model);
             model.load();
@@ -527,7 +531,7 @@ public class DBSession {
         List<Object[]> values = new ArrayList<>(models.size());
         final ModelMetaData meta = databaseSchema.getModelMetaData(models.get(0).getClass());
         models.forEach(m -> {
-            ModelWrapper model = new ModelWrapper(m, meta);
+            ModelWrapper model = new ModelWrapper(m, meta, augmenterHelper);
             setMaintenanceValues(model);
             setTagValues(model);
             model.load();
@@ -650,7 +654,7 @@ public class DBSession {
         ModelMetaData modelMetaData = databaseSchema.getModelMetaData(resultClass);
 
         T object = resultClass.newInstance();
-        ModelWrapper model = new ModelWrapper((AbstractModel) object, modelMetaData);
+        ModelWrapper model = new ModelWrapper((AbstractModel) object, modelMetaData, augmenterHelper);
         model.load();
 
         LinkedCaseInsensitiveMap<String> matchedColumns = new LinkedCaseInsensitiveMap<String>();
@@ -664,6 +668,7 @@ public class DBSession {
         }
 
         addTags(row, matchedColumns, (AbstractModel) object);
+        addAugments(row, matchedColumns, (AbstractModel) object);
         addUnmatchedColumns(row, matchedColumns, (AbstractModel) object);
         decorateRetrievedModel(model);
 
@@ -715,6 +720,24 @@ public class DBSession {
                 }
             }
             tagHelper.addTags((ITaggedModel) model, tagValues);
+        }
+    }
+
+    protected void addAugments(Row row, LinkedCaseInsensitiveMap<String> matchedColumns, AbstractModel model) {
+        if (model instanceof IAugmentedModel) {
+            AugmenterConfig config = augmenterHelper.getAugmenterConfig(model);
+            if (config == null) {
+                log.warn("Missing config for model class" + model.getClass().getSimpleName());
+                return;
+            }
+            Map<String, Object> augmentsValues = new HashMap<>();
+            for (String columnName : row.keySet()) {
+                if (columnName.toUpperCase().startsWith(config.getPrefix())) {
+                    matchedColumns.put(columnName, null);
+                    augmentsValues.put(columnName, row.getString(columnName));
+                }
+                augmenterHelper.addAugments((IAugmentedModel) model, augmentsValues);
+            }
         }
     }
 
